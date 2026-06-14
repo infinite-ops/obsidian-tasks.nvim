@@ -180,6 +180,77 @@ T["filter: due after tomorrow → resolves to ISO date"] = function()
   leaf("due after tomorrow", { type = "date", field = "due", operator = "after", value = expected_tomorrow })
 end
 
+-- ── backward-looking NL date ranges ──────────────────────────────────────────
+
+local function days_from_today(n)
+  local t = os.date("*t") --[[@as osdate]]
+  t.hour = 0
+  t.min = 0
+  t.sec = 0
+  t.day = t.day + n
+  return os.date("%Y-%m-%d", os.time(t)) --[[@as string]]
+end
+
+T["filter: scheduled in the last 7 days → range {today-7, today}"] = function()
+  leaf("scheduled in the last 7 days", {
+    type = "date",
+    field = "scheduled",
+    operator = "in",
+    value = days_from_today(-7),
+    value_end = days_from_today(0),
+  })
+end
+
+T["filter: scheduled in 7 days ago → range {today-7, today}"] = function()
+  leaf("scheduled in 7 days ago", {
+    type = "date",
+    field = "scheduled",
+    operator = "in",
+    value = days_from_today(-7),
+    value_end = days_from_today(0),
+  })
+end
+
+T["filter: due in the last 2 weeks → range {today-14, today}"] = function()
+  leaf("due in the last 2 weeks", {
+    type = "date",
+    field = "due",
+    operator = "in",
+    value = days_from_today(-14),
+    value_end = days_from_today(0),
+  })
+end
+
+T["filter: due in 2 weeks ago → range {today-14, today}"] = function()
+  leaf("due in 2 weeks ago", {
+    type = "date",
+    field = "due",
+    operator = "in",
+    value = days_from_today(-14),
+    value_end = days_from_today(0),
+  })
+end
+
+T["filter: scheduled in the last two days → number word support"] = function()
+  leaf("scheduled in the last two days", {
+    type = "date",
+    field = "scheduled",
+    operator = "in",
+    value = days_from_today(-2),
+    value_end = days_from_today(0),
+  })
+end
+
+T["filter: due in three weeks ago → number word support"] = function()
+  leaf("due in three weeks ago", {
+    type = "date",
+    field = "due",
+    operator = "in",
+    value = days_from_today(-21),
+    value_end = days_from_today(0),
+  })
+end
+
 T["filter: has due date"] = function()
   leaf("has due date", { type = "has_date", field = "due" })
 end

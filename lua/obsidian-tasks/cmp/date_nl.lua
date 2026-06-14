@@ -13,6 +13,12 @@
 --   "in N days"            → today + N days
 --   "in N weeks"           → today + N*7 days
 --   "in N months"          → today + N months (calendar arithmetic)
+--   "in the last N days"   → today - N days
+--   "in the last N weeks"  → today - N*7 days
+--   "in the last N months" → today - N months (calendar arithmetic)
+--   "N days ago"           → today - N days
+--   "N weeks ago"          → today - N*7 days
+--   "N months ago"         → today - N months (calendar arithmetic)
 --   "YYYY-MM-DD"           → pass-through (validated: month 1-12, day 1-31)
 --
 -- Returns nil for any unrecognised or invalid input.
@@ -37,6 +43,8 @@ local DEFAULT_SUGGESTIONS = {
   "next monday",
   "next week",
   "in 3 days",
+  "in the last 7 days",
+  "7 days ago",
 }
 
 -- ── helpers ──────────────────────────────────────────────────────────────────
@@ -118,9 +126,20 @@ function M.parse(arg)
     nine = "9",
     ten = "10",
   }
+  -- Handle "in two weeks" pattern
   local nw_word, nw_unit = lower:match("^in (%a+) (%a+)$")
   if nw_word and NUMBER_WORDS[nw_word] then
     lower = "in " .. NUMBER_WORDS[nw_word] .. " " .. nw_unit
+  end
+  -- Handle "in the last two weeks" pattern
+  local ntlw_word, ntlw_unit = lower:match("^in the last (%a+) (%a+)$")
+  if ntlw_word and NUMBER_WORDS[ntlw_word] then
+    lower = "in the last " .. NUMBER_WORDS[ntlw_word] .. " " .. ntlw_unit
+  end
+  -- Handle "two weeks ago" pattern
+  local nwa_word, nwa_unit = lower:match("^(%a+) (%a+) ago$")
+  if nwa_word and NUMBER_WORDS[nwa_word] then
+    lower = NUMBER_WORDS[nwa_word] .. " " .. nwa_unit .. " ago"
   end
 
   -- ── relative keywords ──────────────────────────────────────────────────────
@@ -154,6 +173,38 @@ function M.parse(arg)
   local n_months = lower:match("^in (%d+) months?$")
   if n_months then
     return fmt(add_months(today_midnight(), tonumber(n_months)))
+  end
+
+  -- ── in the last N days / weeks / months ────────────────────────────────────
+  local last_n_days = lower:match("^in the last (%d+) days?$")
+  if last_n_days then
+    return fmt(add_days(today_midnight(), -tonumber(last_n_days)))
+  end
+
+  local last_n_weeks = lower:match("^in the last (%d+) weeks?$")
+  if last_n_weeks then
+    return fmt(add_days(today_midnight(), -tonumber(last_n_weeks) * 7))
+  end
+
+  local last_n_months = lower:match("^in the last (%d+) months?$")
+  if last_n_months then
+    return fmt(add_months(today_midnight(), -tonumber(last_n_months)))
+  end
+
+  -- ── N days / weeks / months ago ────────────────────────────────────────────
+  local ago_n_days = lower:match("^(%d+) days? ago$")
+  if ago_n_days then
+    return fmt(add_days(today_midnight(), -tonumber(ago_n_days)))
+  end
+
+  local ago_n_weeks = lower:match("^(%d+) weeks? ago$")
+  if ago_n_weeks then
+    return fmt(add_days(today_midnight(), -tonumber(ago_n_weeks) * 7))
+  end
+
+  local ago_n_months = lower:match("^(%d+) months? ago$")
+  if ago_n_months then
+    return fmt(add_months(today_midnight(), -tonumber(ago_n_months)))
   end
 
   -- ── next <weekday> ─────────────────────────────────────────────────────────
@@ -197,6 +248,107 @@ function M.parse(arg)
   end
 
   return nil
+end
+
+--- Parse a backward-looking NL date phrase into an inclusive [start, end] range.
+---
+--- Recognised patterns (case-insensitive):
+---   "in the last N days/weeks/months"  → { today-N, today }
+---   "the last N days/weeks/months"     → { today-N, today }  (without leading "in")
+---   "N days/weeks/months ago"          → { today-N, today }
+---
+--- Number words (one..ten) are supported in all forms.
+--- Returns nil for unrecognised input.
+---
+--- @param  arg string|nil  raw input
+--- @return string|nil      start ISO date
+--- @return string|nil      end ISO date (always today)
+function M.parse_range(arg)
+  if not arg or arg == "" then
+    return nil, nil
+  end
+  local trimmed = vim.trim(arg)
+  if trimmed == "" then
+    return nil, nil
+  end
+  local lower = trimmed:lower()
+
+  local NUMBER_WORDS = {
+    one = "1",
+    two = "2",
+    three = "3",
+    four = "4",
+    five = "5",
+    six = "6",
+    seven = "7",
+    eight = "8",
+    nine = "9",
+    ten = "10",
+  }
+
+  local n_val, unit
+
+  local d1, u1 = lower:match("^in the last (%a+) (%a+)$")
+  if d1 and NUMBER_WORDS[d1] then
+    n_val = tonumber(NUMBER_WORDS[d1])
+    unit = u1
+  end
+
+  if not n_val then
+    local d2, u2 = lower:match("^the last (%a+) (%a+)$")
+    if d2 and NUMBER_WORDS[d2] then
+      n_val = tonumber(NUMBER_WORDS[d2])
+      unit = u2
+    end
+  end
+
+  if not n_val then
+    n_val, unit = lower:match("^in the last (%d+) (%a+)$")
+    if n_val then
+      n_val = tonumber(n_val)
+    end
+  end
+
+  if not n_val then
+    n_val, unit = lower:match("^the last (%d+) (%a+)$")
+    if n_val then
+      n_val = tonumber(n_val)
+    end
+  end
+
+  if not n_val then
+    local a1, a2 = lower:match("^(%a+) (%a+) ago$")
+    if a1 and NUMBER_WORDS[a1] then
+      n_val = tonumber(NUMBER_WORDS[a1])
+      unit = a2
+    end
+  end
+
+  if not n_val then
+    n_val, unit = lower:match("^(%d+) (%a+) ago$")
+    if n_val then
+      n_val = tonumber(n_val)
+    end
+  end
+
+  if not n_val then
+    return nil, nil
+  end
+
+  local today = today_midnight()
+  local start_date
+
+  if unit == "day" or unit == "days" then
+    start_date = fmt(add_days(today, -n_val))
+  elseif unit == "week" or unit == "weeks" then
+    start_date = fmt(add_days(today, -n_val * 7))
+  elseif unit == "month" or unit == "months" then
+    start_date = fmt(add_months(today, -n_val))
+  else
+    return nil, nil
+  end
+
+  return start_date, fmt(today)
 end
 
 --- Return a list of suggestion strings for the date cmp dropdown.

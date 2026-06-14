@@ -17,7 +17,7 @@ M.defaults = {
   blink_cmp = { enabled = true },
   date_input = {
     natural_language = true,
-    suggestions = { "today", "tomorrow", "next monday", "next week", "in 3 days" },
+    suggestions = { "today", "tomorrow", "next monday", "next week", "in 3 days", "in the last 7 days", "7 days ago" },
   },
   log_level = "info",
   max_file_bytes = 1048576,

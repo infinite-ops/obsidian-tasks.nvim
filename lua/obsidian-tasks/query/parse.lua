@@ -416,6 +416,23 @@ local function parse_leaf_filter(s, orig)
             value_end = d2,
           }
         end
+        -- Backward-looking NL range: only meaningful with the `in` operator.
+        -- `scheduled in the last 7 days` or `scheduled in 7 days ago`.
+        -- The query parser consumes `in` as the operator, so raw may be
+        -- `the last 7 days` (without leading "in"). parse_range handles both
+        -- forms and returns {start, end} where end is today.
+        if op.canon == "in" then
+          local r_start, r_end = date_nl.parse_range(raw)
+          if r_start then
+            return {
+              type = "date",
+              field = field,
+              operator = op.canon,
+              value = r_start,
+              value_end = r_end,
+            }
+          end
+        end
         -- Numbered date-range shorthand (`due before 2024-W09`): the operator
         -- composes with the expanded [start,end] range in filter.lua.
         local p_start, p_end = expand_period(raw)

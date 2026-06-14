@@ -8,6 +8,8 @@
 --   • this <weekday> — including today, earlier-this-week, later-this-week
 --   • bare <weekday> — same contract as "this <weekday>"
 --   • in N days / in N weeks / in N months
+--   • in the last N days / in the last N weeks / in the last N months
+--   • N days ago / N weeks ago / N months ago
 --   • ISO pass-through + validation
 --   • nil / empty / garbage → nil
 --   • M.suggestions() default + custom
@@ -123,6 +125,66 @@ end
 
 T["in 3 months → today + 3 months"] = function()
   eq(date_nl.parse("in 3 months"), months_from_today(3))
+end
+
+-- ── in the last N days / weeks / months ──────────────────────────────────────
+
+T["in the last 0 days → today"] = function()
+  eq(date_nl.parse("in the last 0 days"), today_str())
+end
+
+T["in the last 1 day → yesterday"] = function()
+  eq(date_nl.parse("in the last 1 day"), days_from_today(-1))
+end
+
+T["in the last 7 days → today - 7"] = function()
+  eq(date_nl.parse("in the last 7 days"), days_from_today(-7))
+end
+
+T["in the last 2 weeks → today - 14"] = function()
+  eq(date_nl.parse("in the last 2 weeks"), days_from_today(-14))
+end
+
+T["in the last 1 week → today - 7"] = function()
+  eq(date_nl.parse("in the last 1 week"), days_from_today(-7))
+end
+
+T["in the last 1 month → today - 1 month"] = function()
+  eq(date_nl.parse("in the last 1 month"), months_from_today(-1))
+end
+
+T["in the last 3 months → today - 3 months"] = function()
+  eq(date_nl.parse("in the last 3 months"), months_from_today(-3))
+end
+
+-- ── N days / weeks / months ago ──────────────────────────────────────────────
+
+T["0 days ago → today"] = function()
+  eq(date_nl.parse("0 days ago"), today_str())
+end
+
+T["1 day ago → yesterday"] = function()
+  eq(date_nl.parse("1 day ago"), days_from_today(-1))
+end
+
+T["7 days ago → today - 7"] = function()
+  eq(date_nl.parse("7 days ago"), days_from_today(-7))
+end
+
+T["2 weeks ago → today - 14"] = function()
+  eq(date_nl.parse("2 weeks ago"), days_from_today(-14))
+end
+
+T["1 week ago → today - 7"] = function()
+  eq(date_nl.parse("1 week ago"), days_from_today(-7))
+end
+
+T["1 month ago → today - 1 month"] = function()
+  eq(date_nl.parse("1 month ago"), months_from_today(-1))
+end
+
+T["3 months ago → today - 3 months"] = function()
+  eq(date_nl.parse("3 months ago"), months_from_today(-3))
 end
 
 -- ── next <weekday> ────────────────────────────────────────────────────────────
@@ -312,6 +374,124 @@ end
 T["number_word: 'in eleven days' is NOT supported (number > 10)"] = function()
   -- Upstream supports 1-10.  Beyond that, users write digits.
   eq(date_nl.parse("in eleven days"), nil)
+end
+
+T["number_word: 'in the last two days' equals 'in the last 2 days'"] = function()
+  eq(date_nl.parse("in the last two days"), date_nl.parse("in the last 2 days"))
+end
+
+T["number_word: 'in the last three weeks' equals 'in the last 3 weeks'"] = function()
+  eq(date_nl.parse("in the last three weeks"), date_nl.parse("in the last 3 weeks"))
+end
+
+T["number_word: 'two days ago' equals '2 days ago'"] = function()
+  eq(date_nl.parse("two days ago"), date_nl.parse("2 days ago"))
+end
+
+T["number_word: 'three weeks ago' equals '3 weeks ago'"] = function()
+  eq(date_nl.parse("three weeks ago"), date_nl.parse("3 weeks ago"))
+end
+
+T["number_word: 'two months ago' equals '2 months ago'"] = function()
+  eq(date_nl.parse("two months ago"), date_nl.parse("2 months ago"))
+end
+
+-- ── parse_range ───────────────────────────────────────────────────────────────
+
+T["parse_range: 'in the last 7 days' → {today-7, today}"] = function()
+  local s, e = date_nl.parse_range("in the last 7 days")
+  eq(s, days_from_today(-7))
+  eq(e, today_str())
+end
+
+T["parse_range: 'the last 7 days' (no leading 'in') → {today-7, today}"] = function()
+  local s, e = date_nl.parse_range("the last 7 days")
+  eq(s, days_from_today(-7))
+  eq(e, today_str())
+end
+
+T["parse_range: '7 days ago' → {today-7, today}"] = function()
+  local s, e = date_nl.parse_range("7 days ago")
+  eq(s, days_from_today(-7))
+  eq(e, today_str())
+end
+
+T["parse_range: 'in the last 2 weeks' → {today-14, today}"] = function()
+  local s, e = date_nl.parse_range("in the last 2 weeks")
+  eq(s, days_from_today(-14))
+  eq(e, today_str())
+end
+
+T["parse_range: '2 weeks ago' → {today-14, today}"] = function()
+  local s, e = date_nl.parse_range("2 weeks ago")
+  eq(s, days_from_today(-14))
+  eq(e, today_str())
+end
+
+T["parse_range: 'in the last 1 month' → {today-1month, today}"] = function()
+  local s, e = date_nl.parse_range("in the last 1 month")
+  local t = os.date("*t") --[[@as osdate]]
+  t.hour = 0
+  t.min = 0
+  t.sec = 0
+  t.month = t.month - 1
+  local expected = os.date("%Y-%m-%d", os.time(t)) --[[@as string]]
+  eq(s, expected)
+  eq(e, today_str())
+end
+
+T["parse_range: '3 months ago' → {today-3months, today}"] = function()
+  local s, e = date_nl.parse_range("3 months ago")
+  local t = os.date("*t") --[[@as osdate]]
+  t.hour = 0
+  t.min = 0
+  t.sec = 0
+  t.month = t.month - 3
+  local expected = os.date("%Y-%m-%d", os.time(t)) --[[@as string]]
+  eq(s, expected)
+  eq(e, today_str())
+end
+
+T["parse_range: number words 'in the last two days' → same as '2 days'"] = function()
+  local s1, e1 = date_nl.parse_range("in the last two days")
+  local s2, e2 = date_nl.parse_range("in the last 2 days")
+  eq(s1, s2)
+  eq(e1, e2)
+end
+
+T["parse_range: number words 'three weeks ago' → same as '3 weeks ago'"] = function()
+  local s1, e1 = date_nl.parse_range("three weeks ago")
+  local s2, e2 = date_nl.parse_range("3 weeks ago")
+  eq(s1, s2)
+  eq(e1, e2)
+end
+
+T["parse_range: 'the last three weeks' (no 'in') → same as 'in the last 3 weeks'"] = function()
+  local s1, e1 = date_nl.parse_range("the last three weeks")
+  local s2, e2 = date_nl.parse_range("in the last 3 weeks")
+  eq(s1, s2)
+  eq(e1, e2)
+end
+
+T["parse_range: unrecognised input → nil, nil"] = function()
+  local s, e = date_nl.parse_range("tomorrow")
+  eq(s, nil)
+  eq(e, nil)
+end
+
+T["parse_range: empty/nil → nil, nil"] = function()
+  local s1, e1 = date_nl.parse_range(nil)
+  eq(s1, nil)
+  eq(e1, nil)
+  local s2, e2 = date_nl.parse_range("")
+  eq(s2, nil)
+  eq(e2, nil)
+end
+
+T["parse_range: 'in the last 0 days' → {today, today}"] = function()
+  local s, e = date_nl.parse_range("in the last 0 days")
+  eq(s, today_str())
+  eq(e, today_str())
 end
 
 return T
